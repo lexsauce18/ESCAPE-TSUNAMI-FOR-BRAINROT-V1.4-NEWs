@@ -1,0 +1,606 @@
+--[[ 
+    ALPHA HUB | Escape Tsunami For Brainrots
+    REVISED VERSION (Rayfield)
+]]
+
+-- 1. WAIT FOR GAME TO LOAD
+repeat task.wait() until game:IsLoaded()
+
+local Player = game.Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+-- 2. NOTIFY USER
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Alpha Hub";
+    Text = "Loading Interface...";
+    Duration = 5,
+})
+
+-- 3. LOAD LIBRARY (Rayfield)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- 4. CREATE WINDOW
+local Window = Rayfield:CreateWindow({
+    Name = "ALPHA HUB | Escape Tsunami For Brainrots",
+    LoadingTitle = "Alpha Hub Scripts",
+    LoadingSubtitle = "by Alpha Hub Team",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "AlphaHubConfig",
+        FileName = "AlphaHub"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "https://discord.gg/Suk9CryHvx",
+        RememberJoins = true 
+    },
+    KeySystem = false, 
+})
+
+-- ==========================================
+-- GAP DATA & LOGIC
+-- ==========================================
+local gaps = {
+	workspace.Misc.Gaps.Gap1:GetChildren()[2],
+	workspace.Misc.Gaps.Gap2:GetChildren()[2],
+	workspace.Misc.Gaps.Gap3:GetChildren()[2],
+	workspace.Misc.Gaps.Gap4:GetChildren()[2],
+	workspace.Misc.Gaps.Gap5:GetChildren()[2],
+	workspace.Misc.Gaps.Gap6.Mud,
+	workspace.Misc.Gaps.Gap7:GetChildren()[2],
+	workspace.Misc.Gaps.Gap8:GetChildren()[2],
+	workspace.Misc.Gaps.Gap9:GetChildren()[2]
+}
+
+local function getNearestGapIndex()
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return 1 end
+    local root = character.HumanoidRootPart
+    
+    local closestIndex = 1
+    local shortestDistance = math.huge
+    
+    for i, gap in ipairs(gaps) do
+        if gap and gap:IsA("BasePart") then
+            local dist = (root.Position - gap.Position).Magnitude
+            if dist < shortestDistance then
+                shortestDistance = dist
+                closestIndex = i
+            end
+        end
+    end
+    return closestIndex
+end
+
+local function tweenToGap(index)
+    local character = Player.Character
+    local targetPart = gaps[index]
+    if not character or not character:FindFirstChild("HumanoidRootPart") or not targetPart then return end
+    
+    local root = character.HumanoidRootPart
+    local tweenInfo = TweenInfo.new(1.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    
+    -- Target position + 3 studs up to avoid clipping
+    local targetCFrame = targetPart.CFrame * CFrame.new(0, 3, 0)
+    
+    local tween = TweenService:Create(root, tweenInfo, {CFrame = targetCFrame})
+    tween:Play()
+end
+
+-- ==========================================
+-- REMOTE REFERENCES
+-- ==========================================
+local SellAllRemote = ReplicatedStorage:WaitForChild("RemoteFunctions"):WaitForChild("SellAll")
+local SellToolRemote = ReplicatedStorage:WaitForChild("RemoteFunctions"):WaitForChild("SellTool")
+local UpgradeRemote = ReplicatedStorage:WaitForChild("RemoteFunctions"):WaitForChild("UpgradeSpeed")
+local RebirthRemote = ReplicatedStorage:WaitForChild("RemoteFunctions"):WaitForChild("Rebirth")
+local WheelRemote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Net"):WaitForChild("RF/WheelSpin.Roll")
+
+-- ==========================================
+-- TAB 1: MAIN (User Stats)
+-- ==========================================
+local MainTab = Window:CreateTab("Main", 4483345998)
+local InfoSection = MainTab:CreateSection("User Information")
+
+MainTab:CreateLabel("Username: " .. Player.Name)
+MainTab:CreateLabel("Display Name: " .. Player.DisplayName)
+MainTab:CreateLabel("User ID: " .. Player.UserId)
+MainTab:CreateLabel("Account Age: " .. Player.AccountAge .. " days")
+
+local CreditsSection = MainTab:CreateSection("Credits")
+MainTab:CreateLabel("Scripting: LexSauce / Alpha Hub Team")
+
+local SocialSection = MainTab:CreateSection("Community")
+MainTab:CreateButton({
+    Name = "Copy Discord Invite",
+    Callback = function()
+        setclipboard("https://discord.gg/avGM6WQKCx")
+        Rayfield:Notify({
+            Title = "Link Copied!",
+            Content = "The Discord invite has been copied to your clipboard.",
+            Duration = 5,
+            Image = 4483345998,
+        })
+    end,
+})
+
+-- ==========================================
+-- TAB 2: GAME TAB (Movement)
+-- ==========================================
+local GameTab = Window:CreateTab("Game Tab", 4483345998)
+
+-- --- GAP NAVIGATION SECTION ---
+GameTab:CreateSection("Gap Navigation")
+
+GameTab:CreateButton({
+    Name = "Gap Up (+1)",
+    Callback = function()
+        local currentIndex = getNearestGapIndex()
+        if currentIndex < #gaps then
+            tweenToGap(currentIndex + 1)
+        else
+            Rayfield:Notify({Title = "Limit Reached", Content = "You are already at the last gap!", Duration = 3})
+        end
+    end,
+})
+
+GameTab:CreateButton({
+    Name = "Gap Down (-1)",
+    Callback = function()
+        local currentIndex = getNearestGapIndex()
+        if currentIndex > 1 then
+            tweenToGap(currentIndex - 1)
+        else
+            Rayfield:Notify({Title = "Limit Reached", Content = "You are at the first gap!", Duration = 3})
+        end
+    end,
+})
+
+-- ---  ESP SECTION ---
+GameTab:CreateSection("ESP")
+
+local LB_PATH = workspace:WaitForChild("ActiveLuckyBlocks")
+_G.LB_ESP_Enabled = false
+_G.LB_Filters = {"All"} 
+
+local function RemoveESP(block)
+    if block:FindFirstChild("ESPHighlight") then block.ESPHighlight:Destroy() end
+    if block:FindFirstChild("ESPLabel") then block.ESPLabel:Destroy() end
+end
+
+local function ApplyLB_ESP(block)
+    RemoveESP(block)
+    if not _G.LB_ESP_Enabled then return end
+
+    local rarityObj = block:FindFirstChild("Rarity") or block:FindFirstChild("Type")
+    local rarityName = rarityObj and tostring(rarityObj.Value) or block.Name
+    
+    local shouldShow = false
+    
+    if table.find(_G.LB_Filters, "All") then
+        shouldShow = true
+    else
+        for _, filterValue in ipairs(_G.LB_Filters) do
+            if string.find(string.lower(rarityName), string.lower(filterValue)) then
+                shouldShow = true
+                break
+            end
+        end
+    end
+
+    if not shouldShow then return end
+
+    local hl = Instance.new("Highlight")
+    hl.Name = "ESPHighlight"
+    hl.FillColor = Color3.fromRGB(255, 215, 0)
+    hl.OutlineColor = Color3.new(1,1,1)
+    hl.Parent = block
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "ESPLabel"
+    bb.Size = UDim2.new(0, 200, 0, 50)
+    bb.StudsOffset = Vector3.new(0, 3, 0)
+    bb.AlwaysOnTop = true
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Parent = bb
+    lbl.BackgroundTransparency = 1
+    lbl.Size = UDim2.new(1,0,1,0)
+    lbl.Text = rarityName
+    lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.TextStrokeTransparency = 0
+    lbl.TextScaled = true
+    
+    bb.Parent = block
+end
+
+local function RefreshESP()
+    for _, v in ipairs(LB_PATH:GetChildren()) do
+        ApplyLB_ESP(v)
+    end
+end
+
+GameTab:CreateToggle({
+    Name = "Enable Lucky Block ESP",
+    CurrentValue = false,
+    Flag = "LBToggle",
+    Callback = function(Value)
+        _G.LB_ESP_Enabled = Value
+        RefreshESP()
+    end,
+})
+
+GameTab:CreateDropdown({
+    Name = "Select Rarity Filter",
+    Options = {"All", "Common", "Rare", "Epic", "Legendary", "Mythical", "Cosmic", "Secret", "Celestial", "Divine"},
+    CurrentOption = {"All"},
+    MultipleOptions = true, 
+    Flag = "LBFilter",
+    Callback = function(Options)
+        _G.LB_Filters = Options 
+        RefreshESP()
+    end,
+})
+
+LB_PATH.ChildAdded:Connect(function(child)
+    task.wait(0.1)
+    if _G.LB_ESP_Enabled then ApplyLB_ESP(child) end
+end)
+
+-- --- PROXIMITY SECTION ---
+GameTab:CreateSection("Interaction")
+
+_G.InstantPrompt = false
+local originalDurations = {} 
+
+GameTab:CreateToggle({
+    Name = "Instant Proximity Prompt",
+    CurrentValue = false,
+    Flag = "InstantPromptToggle",
+    Callback = function(Value)
+        _G.InstantPrompt = Value
+        if Value then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("ProximityPrompt") then
+                    if not originalDurations[obj] then
+                        originalDurations[obj] = obj.HoldDuration
+                    end
+                    obj.HoldDuration = 0
+                end
+            end
+        else
+            for obj, duration in pairs(originalDurations) do
+                if obj and obj.Parent then
+                    obj.HoldDuration = duration
+                end
+            end
+            table.clear(originalDurations)
+        end
+    end,
+})
+
+workspace.DescendantAdded:Connect(function(obj)
+    if obj:IsA("ProximityPrompt") then
+        if _G.InstantPrompt then
+            originalDurations[obj] = obj.HoldDuration
+            obj.HoldDuration = 0
+        end
+    end
+end)
+
+-- --- ZOOM UNLOCK BUTTON ---
+GameTab:CreateButton({
+    Name = "Unlock Max Zoom",
+    Callback = function()
+        _G.ZoomUnlocked = true
+        Rayfield:Notify({
+            Title = "Zoom Unlocked",
+            Content = "Max Zoom set to 1000. You can now scroll out freely!",
+            Duration = 5,
+            Image = 4483345998,
+        })
+    end,
+})
+
+task.spawn(function()
+    while true do
+        if _G.ZoomUnlocked then
+            Player.CameraMaxZoomDistance = 1000
+        end
+        task.wait(0.5)
+    end
+end)
+
+GameTab:CreateSection("Movement Mods")
+GameTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 300},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "SliderSpeed", 
+    Callback = function(Value)
+        pcall(function() Player.Character.Humanoid.WalkSpeed = Value end)
+    end,
+})
+
+GameTab:CreateSlider({
+    Name = "JumpPower",
+    Range = {50, 400},
+    Increment = 1,
+    Suffix = "Jump",
+    CurrentValue = 50,
+    Flag = "SliderJump", 
+    Callback = function(Value)
+        pcall(function() Player.Character.Humanoid.JumpPower = Value end)
+    end,
+})
+
+GameTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "ToggleInfJump", 
+    Callback = function(Value)
+        _G.InfJump = Value
+    end,
+})
+
+GameTab:CreateSection("Fly")
+local flying = false
+local speed = 50
+local bv, bg
+
+GameTab:CreateToggle({
+    Name = "Fly (On/Off)",
+    CurrentValue = false,
+    Flag = "FlyToggle",
+    Callback = function(Value)
+        flying = Value
+        local char = Player.Character
+        if flying then
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+            bv = Instance.new("BodyVelocity", root)
+            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bg = Instance.new("BodyGyro", root)
+            bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            bg.P = 9000
+            task.spawn(function()
+                while flying do
+                    bg.CFrame = workspace.CurrentCamera.CFrame
+                    local direction = Vector3.new(0,0,0)
+                    local UIS = game:GetService("UserInputService")
+                    if UIS:IsKeyDown(Enum.KeyCode.W) then direction = direction + workspace.CurrentCamera.CFrame.LookVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.S) then direction = direction - workspace.CurrentCamera.CFrame.LookVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.A) then direction = direction - workspace.CurrentCamera.CFrame.RightVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.D) then direction = direction + workspace.CurrentCamera.CFrame.RightVector end
+                    bv.Velocity = direction * speed
+                    task.wait()
+                end
+                if bv then bv:Destroy() end
+                if bg then bg:Destroy() end
+            end)
+        else
+            if bv then bv:Destroy() end
+            if bg then bg:Destroy() end
+        end
+    end,
+})
+
+-- ==========================================
+-- TAB 3: AUTOMATION
+-- ==========================================
+local Automation = Window:CreateTab("Automation", 4483345998)
+
+Automation:CreateSection("UFO Coin Event ")
+
+_G.AutoCollectUFO = false
+_G.UFO_Delay = 0.15
+
+Automation:CreateToggle({
+    Name = "Auto-Collect UFO Coins",
+    CurrentValue = false,
+    Flag = "UFOToggle",
+    Callback = function(Value)
+        _G.AutoCollectUFO = Value
+        if _G.AutoCollectUFO then
+            task.spawn(function()
+                local UFOParts = workspace:WaitForChild("UFOEventParts", 5)
+                local CoinBombEvent = ReplicatedStorage.Packages.Net:FindFirstChild("RE/CoinBombEvent")
+                
+                if not UFOParts or not CoinBombEvent then
+                    Rayfield:Notify({Title = "Error", Content = "UFO Event parts not found!", Duration = 5})
+                    return
+                end
+
+                local function processCoin(coin)
+                    if not _G.AutoCollectUFO then return end
+                    local hitbox = coin:WaitForChild("Hitbox", 1)
+                    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if hitbox and hrp then
+                        hitbox.CFrame = hrp.CFrame
+                        CoinBombEvent:FireServer(coin)
+                    end
+                end
+
+                while _G.AutoCollectUFO do
+                    for _, coin in ipairs(UFOParts:GetChildren()) do
+                        if not _G.AutoCollectUFO then break end
+                        processCoin(coin)
+                        task.wait(_G.UFO_Delay)
+                    end
+                    task.wait(1) 
+                end
+            end)
+        end
+    end,
+})
+
+Automation:CreateSlider({
+    Name = "Collection Delay",
+    Range = {0.05, 1},
+    Increment = 0.05,
+    Suffix = "s",
+    CurrentValue = 0.15,
+    Flag = "UFODelay",
+    Callback = function(Value)
+        _G.UFO_Delay = Value
+    end,
+})
+
+Automation:CreateSection("Radioactive Coin Event")
+_G.AutoCollectRadioactive = false
+
+Automation:CreateToggle({
+    Name = "Auto-Collect Radioactive Coins",
+    CurrentValue = false,
+    Flag = "RadioactiveToggle",
+    Callback = function(Value)
+        _G.AutoCollectRadioactive = Value
+        if _G.AutoCollectRadioactive then
+            task.spawn(function()
+                while _G.AutoCollectRadioactive do
+                    pcall(function()
+                        local eventFolder = workspace.EventParts:GetChildren()[8]
+                        local coin = eventFolder:FindFirstChild("Radioactive Coin")
+                        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                        
+                        if coin and hrp then
+                            coin.CFrame = hrp.CFrame
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end,
+})
+
+Automation:CreateSection("Wheel Spin System")
+_G.AutoSpinWheel = false
+_G.SpinDelay = 1
+
+Automation:CreateToggle({
+    Name = "Auto-Spin Wheel",
+    CurrentValue = false,
+    Flag = "WheelToggle",
+    Callback = function(Value)
+        _G.AutoSpinWheel = Value
+        if _G.AutoSpinWheel then
+            task.spawn(function()
+                while _G.AutoSpinWheel do
+                    local args = {"UFO", false}
+                    pcall(function()
+                        WheelRemote:InvokeServer(unpack(args))
+                    end)
+                    task.wait(_G.SpinDelay)
+                end
+            end)
+        end
+    end,
+})
+
+Automation:CreateSection("Selling System")
+
+Automation:CreateButton({
+    Name = "Sell Holding",
+    Callback = function()
+        local tool = Player.Character and Player.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            SellToolRemote:InvokeServer(tool)
+        else
+            Rayfield:Notify({Title = "Error", Content = "Hold an item to sell it!", Duration = 3})
+        end
+    end,
+})
+
+Automation:CreateButton({
+    Name = "Sell All Items",
+    Callback = function()
+        SellAllRemote:InvokeServer()
+    end,
+})
+
+_G.AutoSellLoop = false
+Automation:CreateToggle({
+    Name = "Auto Sell All (Loop)",
+    CurrentValue = false,
+    Flag = "AutoSellToggle",
+    Callback = function(Value)
+        _G.AutoSellLoop = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoSellLoop do
+                    pcall(function() SellAllRemote:InvokeServer() end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+
+Automation:CreateSection("Upgrades & Rebirth")
+
+_G.AutoBuySpeed = false
+Automation:CreateToggle({
+   Name = "Auto-Buy Speed Upgrades",
+   CurrentValue = false,
+   Flag = "AutoBuyToggle",
+   Callback = function(Value)
+       _G.AutoBuySpeed = Value
+       if _G.AutoBuySpeed then
+           task.spawn(function()
+               while _G.AutoBuySpeed do
+                   pcall(function()
+                       UpgradeRemote:InvokeServer(10)
+                   end)
+                   task.wait(0.5)
+               end
+           end)
+       end
+   end,
+})
+
+_G.AutoRebirth = false
+Automation:CreateToggle({
+    Name = "Auto-Rebirth (Fast)",
+    CurrentValue = false,
+    Flag = "AutoRebirthToggle",
+    Callback = function(Value)
+        _G.AutoRebirth = Value
+        if _G.AutoRebirth then
+            task.spawn(function()
+                while _G.AutoRebirth do
+                    pcall(function() RebirthRemote:InvokeServer() end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+
+local SettingsTab = Window:CreateTab("Settings", 4483345998)
+SettingsTab:CreateButton({
+    Name = "Destroy UI",
+    Callback = function()
+        Rayfield:Destroy()
+    end,
+})
+SettingsTab:CreateLabel("Alpha Hub V1.0")
+
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if _G.InfJump then
+        pcall(function()
+            Player.Character:FindFirstChildOfClass('Humanoid'):ChangeState("Jumping")
+        end)
+    end
+end)
+
+Rayfield:Notify({
+    Title = "Alpha Hub Loaded",
+    Content = "Welcome, " .. Player.DisplayName .. "!",
+    Duration = 5,
+    Image = 4483345998,
+})
