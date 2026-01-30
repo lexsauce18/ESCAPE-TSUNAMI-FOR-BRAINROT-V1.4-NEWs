@@ -460,7 +460,6 @@ Automation:CreateToggle({
             task.spawn(function()
                 local CoinBombEvent = ReplicatedStorage.Packages.Net:FindFirstChild("RE/CoinBombEvent")
                 
-                -- Loop stays active as long as toggle is ON
                 while _G.AutoCollectUFO do
                     local UFOParts = workspace:FindFirstChild("UFOEventParts")
                     
@@ -472,18 +471,25 @@ Automation:CreateToggle({
                             local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                             
                             if hitbox and hrp then
-                                -- Teleport coin to player and fire event
+                                -- Teleport coin to player
                                 hitbox.CFrame = hrp.CFrame
+                                
                                 if CoinBombEvent then
                                     CoinBombEvent:FireServer(coin)
                                 end
-                                -- FIX: Remove locally so it disappears immediately
-                                coin:Destroy() 
+                                
+                                -- FIX: Added a small delay before destroying locally 
+                                -- This allows the server time to process the "Touch" or "Remote"
+                                task.delay(0.8, function()
+                                    if coin and coin.Parent then
+                                        coin:Destroy()
+                                    end
+                                end)
                             end
                             task.wait(_G.UFO_Delay)
                         end
                     end
-                    task.wait(1) -- Wait and check again if no coins are currently spawned
+                    task.wait(1) 
                 end
             end)
         end
@@ -520,20 +526,24 @@ Automation:CreateToggle({
                         local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                         
                         if eventFolder and hrp then
-                            -- Look through EventParts for any Radioactive Coins
                             for _, folder in ipairs(eventFolder:GetChildren()) do
                                 for _, coin in ipairs(folder:GetChildren()) do
-                                    if coin.Name == "Radioactive Coin" then
+                                    if coin.Name == "Radioactive Coin" and coin:IsA("BasePart") then
+                                        -- Teleport to player
                                         coin.CFrame = hrp.CFrame
-                                        -- Note: If this event uses a specific Remote, add it here.
-                                        -- To make it disappear locally:
-                                        task.delay(0.1, function() coin:Destroy() end)
+                                        
+                                        -- FIX: Increased delay to ensure server registration
+                                        task.delay(0.8, function() 
+                                            if coin and coin.Parent then
+                                                coin:Destroy() 
+                                            end
+                                        end)
                                     end
                                 end
                             end
                         end
                     end)
-                    task.wait(0.5) -- Optimized wait for background scanning
+                    task.wait(0.5) 
                 end
             end)
         end
