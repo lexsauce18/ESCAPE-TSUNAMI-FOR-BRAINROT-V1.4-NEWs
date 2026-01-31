@@ -130,6 +130,44 @@ MainTab:CreateButton({
 -- ==========================================
 local GameTab = Window:CreateTab("Game Tab", 4483345998)
 
+-- --- VIP NAVIGATION SECTION ---
+GameTab:CreateSection("VIP Navigation ( DO NOT SPAM )")
+
+GameTab:CreateButton({
+    Name = "Destroy VIP Walls",
+    Callback = function()
+        local walls = workspace:FindFirstChild("VIPWalls")
+        if walls then
+            walls:Destroy()
+            Rayfield:Notify({Title = "Alpha Hub", Content = "VIP Walls Destroyed!", Duration = 3})
+        else
+            Rayfield:Notify({Title = "Error", Content = "VIPWalls not found in Workspace", Duration = 3})
+        end
+    end,
+})
+
+GameTab:CreateButton({
+    Name = "VIP Up (+1)",
+    Callback = function()
+        local currentIndex = getNearestVIPIndex()
+        if currentIndex < #vipLocations then
+            tweenToVIP(vipLocations[currentIndex + 1])
+        end
+    end,
+})
+
+GameTab:CreateButton({
+    Name = "VIP Down (-1)",
+    Callback = function()
+        local currentIndex = getNearestVIPIndex()
+        if currentIndex > 1 then
+            tweenToVIP(vipLocations[currentIndex - 1])
+        end
+    end,
+})
+
+GameTab:CreateLabel("DON'T GO NEAR THE WAVES PLAYER WILL DIE")
+
 -- --- GAP NAVIGATION SECTION ---
 GameTab:CreateSection("Gap Navigation")
 
@@ -173,37 +211,31 @@ local function ApplyLB_ESP(block)
     RemoveESP(block)
     if not _G.LB_ESP_Enabled then return end
 
-    -- Detect Rarity, Mutation, and Name
     local rarityObj = block:FindFirstChild("Rarity") or block:FindFirstChild("Type")
     local mutationObj = block:FindFirstChild("Mutation")
     
     local rarityName = rarityObj and tostring(rarityObj.Value) or block.Name
     local mutationName = mutationObj and tostring(mutationObj.Value) or ""
-    
-    -- Combine display name
     local displayName = mutationName ~= "" and (mutationName .. " " .. rarityName) or rarityName
     
-    -- Special Check for Rare Blocks
     local nameLower = string.lower(block.Name)
     local rarityLower = string.lower(rarityName)
     
+    -- Detection Logic
     local isUfo = string.find(nameLower, "ufo") or string.find(rarityLower, "ufo")
     local isAdmin = string.find(nameLower, "admin") or string.find(rarityLower, "admin")
     local isRadioactive = string.find(nameLower, "radioactive") or string.find(rarityLower, "radioactive")
+    local isMoney = string.find(nameLower, "money") or string.find(rarityLower, "money")
     
-    if isUfo then 
-        displayName = "🛸 UFO LUCKY BLOCK" 
-    elseif isAdmin then
-        displayName = "⚡ ADMIN LUCKY BLOCK"
-    elseif isRadioactive then
-        displayName = "☢️ RADIOACTIVE LUCKY BLOCK"
-    end
+    if isUfo then displayName = "UFO LUCKY BLOCK" 
+    elseif isAdmin then displayName = "ADMIN LUCKY BLOCK"
+    elseif isRadioactive then displayName = "RADIOACTIVE LUCKY BLOCK"
+    elseif isMoney then displayName = "MONEY LUCKY BLOCK" end
 
     local shouldShow = false
     if table.find(_G.LB_Filters, "All") then
         shouldShow = true
     else
-        -- Check if current block matches any selected filters
         for _, filterValue in ipairs(_G.LB_Filters) do
             if string.find(string.lower(displayName), string.lower(filterValue)) then
                 shouldShow = true
@@ -214,27 +246,19 @@ local function ApplyLB_ESP(block)
 
     if not shouldShow then return end
 
-    -- Visual Highlight
     local hl = Instance.new("Highlight")
     hl.Name = "ESPHighlight"
     
     -- Color Logic
-    if isAdmin then
-        hl.FillColor = Color3.fromRGB(255, 50, 50) -- Bright Red
-    elseif isRadioactive then
-        hl.FillColor = Color3.fromRGB(150, 255, 0) -- Lime Green
-    elseif isUfo then
-        hl.FillColor = Color3.fromRGB(0, 255, 100) -- Neon Cyan/Green
-    elseif mutationName ~= "" then
-        hl.FillColor = Color3.fromRGB(255, 0, 255) -- Purple for Mutated
-    else
-        hl.FillColor = Color3.fromRGB(255, 215, 0) -- Gold for Normal
-    end
+    if isAdmin then hl.FillColor = Color3.fromRGB(255, 50, 50) 
+    elseif isRadioactive then hl.FillColor = Color3.fromRGB(150, 255, 0) 
+    elseif isMoney then hl.FillColor = Color3.fromRGB(0, 255, 0) -- Pure Green for Money
+    elseif isUfo then hl.FillColor = Color3.fromRGB(0, 255, 100) 
+    else hl.FillColor = Color3.fromRGB(255, 215, 0) end
     
-    hl.OutlineColor = Color3.new(1,1,1)
+    hl.FillTransparency = 0.5
     hl.Parent = block
 
-    -- Billboard Label
     local bb = Instance.new("BillboardGui")
     bb.Name = "ESPLabel"
     bb.Size = UDim2.new(0, 200, 0, 50)
@@ -246,57 +270,34 @@ local function ApplyLB_ESP(block)
     lbl.BackgroundTransparency = 1
     lbl.Size = UDim2.new(1,0,1,0)
     lbl.Text = displayName
-    
-    -- Label Color Logic
-    if isAdmin then lbl.TextColor3 = Color3.fromRGB(255, 0, 0)
-    elseif isRadioactive then lbl.TextColor3 = Color3.fromRGB(170, 255, 0)
-    elseif isUfo then lbl.TextColor3 = Color3.fromRGB(0, 255, 150)
-    else lbl.TextColor3 = Color3.new(1,1,1) end
-    
+    lbl.TextColor3 = hl.FillColor
     lbl.TextStrokeTransparency = 0
     lbl.TextScaled = true
-    
+    lbl.Font = Enum.Font.GothamBold
     bb.Parent = block
 end
 
-local function RefreshESP()
-    for _, v in ipairs(LB_PATH:GetChildren()) do
-        ApplyLB_ESP(v)
-    end
-end
-
--- UI Controls
 GameTab:CreateToggle({
     Name = "Enable Lucky Block ESP",
     CurrentValue = false,
     Flag = "LBToggle",
     Callback = function(Value)
         _G.LB_ESP_Enabled = Value
-        RefreshESP()
+        for _, v in ipairs(LB_PATH:GetChildren()) do ApplyLB_ESP(v) end
     end,
 })
 
 GameTab:CreateDropdown({
     Name = "Select Rarity Filter",
-    -- Added "Radioactive" to the options
-    Options = {"All", "Common", "Rare", "Epic", "Legendary", "Mythical", "Cosmic", "Secret", "Celestial", "Divine", "Ufo", "Admin", "Radioactive"},
+    Options = {"All", "Common", "Rare", "Epic", "Legendary", "Mythical", "Cosmic", "Secret", "Ufo", "Admin", "Radioactive", "Money"},
     CurrentOption = {"All"},
     MultipleOptions = true, 
     Flag = "LBFilter",
     Callback = function(Options)
         _G.LB_Filters = Options 
-        RefreshESP()
+        for _, v in ipairs(LB_PATH:GetChildren()) do ApplyLB_ESP(v) end
     end,
 })
-
--- AUTO-DETECT NEW BLOCKS
-LB_PATH.ChildAdded:Connect(function(child)
-    if _G.LB_ESP_Enabled then
-        task.delay(0.2, function()
-            ApplyLB_ESP(child)
-        end)
-    end
-end)
 
 -- --- PROXIMITY SECTION ---
 GameTab:CreateSection("Interaction")
@@ -444,8 +445,64 @@ GameTab:CreateToggle({
 -- ==========================================
 local Automation = Window:CreateTab("Automation", 4483345998)
 
--- --- UFO Coin Event ---
-Automation:CreateSection("UFO Coin Event")
+--- AUTO COIN EVENT ---
+
+Automation:CreateSection("Auto Collect Coins")
+
+_G.AutoTPMoneyEvent = false
+_G.MoneyTPDelay = 0.2 
+
+Automation:CreateToggle({
+    Name = "Auto-Collect All Money Coins",
+    CurrentValue = false,
+    Flag = "MoneyEventTPToggle",
+    Callback = function(Value)
+        _G.AutoTPMoneyEvent = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoTPMoneyEvent do
+                    local character = Player.Character
+                    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                    local moneyFolder = workspace:FindFirstChild("MoneyEventParts")
+                    
+                    if hrp and moneyFolder then
+                        for _, coin in ipairs(moneyFolder:GetChildren()) do
+                            if not _G.AutoTPMoneyEvent then break end
+                            
+                            local mainPart = coin:FindFirstChild("Main")
+                            
+                            if mainPart and mainPart:IsA("BasePart") then
+                                -- FIX: Stop physics from pulling the PLAYER to the COIN
+                                mainPart.Velocity = Vector3.new(0,0,0)
+                                mainPart.RotVelocity = Vector3.new(0,0,0)
+                                mainPart.CanCollide = false -- Prevents coin from hitting/moving you
+                                
+                                -- Teleport the coin to a position slightly in front of you
+                                -- (Using CFrame.new ensures the coin moves to you, not vice versa)
+                                mainPart.CFrame = hrp.CFrame * CFrame.new(0, 0, -1)
+                                
+                                -- Simulate the touch
+                                firetouchinterest(hrp, mainPart, 0)
+                                task.wait(0.05)
+                                firetouchinterest(hrp, mainPart, 1)
+                                
+                                -- Delayed destruction so server catches up
+                                task.delay(0.9, function()
+                                    if coin and coin.Parent then 
+                                        coin:Destroy() 
+                                    end
+                                end)
+                                
+                                task.wait(_G.MoneyTPDelay)
+                            end
+                        end
+                    end
+                    task.wait(1) 
+                end
+            end)
+        end
+    end,
+})
 
 _G.AutoCollectUFO = false
 _G.UFO_Delay = 0.15
@@ -460,6 +517,7 @@ Automation:CreateToggle({
             task.spawn(function()
                 local CoinBombEvent = ReplicatedStorage.Packages.Net:FindFirstChild("RE/CoinBombEvent")
                 
+                -- Loop stays active as long as toggle is ON
                 while _G.AutoCollectUFO do
                     local UFOParts = workspace:FindFirstChild("UFOEventParts")
                     
@@ -471,25 +529,20 @@ Automation:CreateToggle({
                             local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                             
                             if hitbox and hrp then
-                                -- Teleport coin to player
+                                -- Teleport coin to player and fire event
                                 hitbox.CFrame = hrp.CFrame
-                                
                                 if CoinBombEvent then
                                     CoinBombEvent:FireServer(coin)
                                 end
-                                
-                                -- FIX: Added a small delay before destroying locally 
-                                -- This allows the server time to process the "Touch" or "Remote"
-                                task.delay(0.8, function()
-                                    if coin and coin.Parent then
-                                        coin:Destroy()
-                                    end
+                                -- UPDATED: Added a 0.5s delay before local destruction to ensure collection
+                                task.delay(0.9, function()
+                                    if coin then coin:Destroy() end
                                 end)
                             end
                             task.wait(_G.UFO_Delay)
                         end
                     end
-                    task.wait(1) 
+                    task.wait(1) -- Wait and check again if no coins are currently spawned
                 end
             end)
         end
@@ -508,8 +561,6 @@ Automation:CreateSlider({
     end,
 })
 
--- --- Radioactive Coin Event ---
-Automation:CreateSection("Radioactive Coin Event")
 _G.AutoCollectRadioactive = false
 
 Automation:CreateToggle({
@@ -526,48 +577,21 @@ Automation:CreateToggle({
                         local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                         
                         if eventFolder and hrp then
+                            -- Look through EventParts for any Radioactive Coins
                             for _, folder in ipairs(eventFolder:GetChildren()) do
                                 for _, coin in ipairs(folder:GetChildren()) do
-                                    if coin.Name == "Radioactive Coin" and coin:IsA("BasePart") then
-                                        -- Teleport to player
+                                    if coin.Name == "Radioactive Coin" then
                                         coin.CFrame = hrp.CFrame
-                                        
-                                        -- FIX: Increased delay to ensure server registration
-                                        task.delay(0.8, function() 
-                                            if coin and coin.Parent then
-                                                coin:Destroy() 
-                                            end
+                                        -- UPDATED: Increased delay to 0.5s to ensure collection
+                                        task.delay(0.9, function() 
+                                            if coin then coin:Destroy() end 
                                         end)
                                     end
                                 end
                             end
                         end
                     end)
-                    task.wait(0.5) 
-                end
-            end)
-        end
-    end,
-})
-
-Automation:CreateSection("Wheel Spin System")
-_G.AutoSpinWheel = false
-_G.SpinDelay = 1
-
-Automation:CreateToggle({
-    Name = "Auto-Spin Wheel",
-    CurrentValue = false,
-    Flag = "WheelToggle",
-    Callback = function(Value)
-        _G.AutoSpinWheel = Value
-        if _G.AutoSpinWheel then
-            task.spawn(function()
-                while _G.AutoSpinWheel do
-                    local args = {"UFO", false}
-                    pcall(function()
-                        WheelRemote:InvokeServer(unpack(args))
-                    end)
-                    task.wait(_G.SpinDelay)
+                    task.wait(0.5) -- Optimized wait for background scanning
                 end
             end)
         end
