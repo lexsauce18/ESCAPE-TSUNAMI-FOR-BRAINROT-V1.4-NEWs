@@ -39,7 +39,7 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- ==========================================
--- GAP DATA & LOGIC
+-- DATA & LOGIC
 -- ==========================================
 local gaps = {
 	workspace.Misc.Gaps.Gap1:GetChildren()[2],
@@ -53,14 +53,24 @@ local gaps = {
 	workspace.Misc.Gaps.Gap9:GetChildren()[2]
 }
 
+-- VIP Locations from your script
+local vipLocations = {
+	Vector3.new(241.47, 3.27, -139.51),
+	Vector3.new(341.39, 3.27, -139.50),
+	Vector3.new(470.24, 3.27, -139.53),
+	Vector3.new(647.98, 3.27, -139.51),
+	Vector3.new(917.80, 3.27, -139.51),
+	Vector3.new(1321.95, 3.27, -139.51),
+	Vector3.new(1912.83, 3.27, -138.53),
+	Vector3.new(2427.05, 3.27, -139.01)
+}
+
 local function getNearestGapIndex()
     local character = Player.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then return 1 end
     local root = character.HumanoidRootPart
-    
     local closestIndex = 1
     local shortestDistance = math.huge
-    
     for i, gap in ipairs(gaps) do
         if gap and gap:IsA("BasePart") then
             local dist = (root.Position - gap.Position).Magnitude
@@ -73,19 +83,48 @@ local function getNearestGapIndex()
     return closestIndex
 end
 
+-- Nearest Index function for VIP
+local function getNearestVIPIndex()
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return 1 end
+    local root = character.HumanoidRootPart
+    local closestIndex = 1
+    local shortestDistance = math.huge
+    for i, pos in ipairs(vipLocations) do
+        local distance = (root.Position - pos).Magnitude
+        if distance < shortestDistance then
+            shortestDistance = distance
+            closestIndex = i
+        end
+    end
+    return closestIndex
+end
+
 local function tweenToGap(index)
     local character = Player.Character
     local targetPart = gaps[index]
     if not character or not character:FindFirstChild("HumanoidRootPart") or not targetPart then return end
-    
     local root = character.HumanoidRootPart
     local tweenInfo = TweenInfo.new(1.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-    
-    -- Target position + 3 studs up to avoid clipping
     local targetCFrame = targetPart.CFrame * CFrame.new(0, 7, 0)
-    
     local tween = TweenService:Create(root, tweenInfo, {CFrame = targetCFrame})
     tween:Play()
+end
+
+-- Tween function for VIP
+local function tweenToVIP(targetVector)
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local root = character.HumanoidRootPart
+    local tweenInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local targetCFrame = CFrame.new(targetVector + Vector3.new(0, 3, 0))
+    
+    root.Anchored = true
+    local tween = TweenService:Create(root, tweenInfo, {CFrame = targetCFrame})
+    tween:Play()
+    tween.Completed:Connect(function()
+        root.Anchored = false
+    end)
 end
 
 -- ==========================================
@@ -208,8 +247,13 @@ local function RemoveESP(block)
 end
 
 local function ApplyLB_ESP(block)
+    -- Ensure we don't double-up ESP on the same block
     RemoveESP(block)
     if not _G.LB_ESP_Enabled then return end
+
+    -- Wait a tiny bit for the game to set the Rarity/Name values on spawn
+    task.wait(0.1) 
+    if not block.Parent then return end -- Check if it still exists
 
     local rarityObj = block:FindFirstChild("Rarity") or block:FindFirstChild("Type")
     local mutationObj = block:FindFirstChild("Mutation")
@@ -226,11 +270,15 @@ local function ApplyLB_ESP(block)
     local isAdmin = string.find(nameLower, "admin") or string.find(rarityLower, "admin")
     local isRadioactive = string.find(nameLower, "radioactive") or string.find(rarityLower, "radioactive")
     local isMoney = string.find(nameLower, "money") or string.find(rarityLower, "money")
+    local isCelestial = string.find(nameLower, "celestial") or string.find(rarityLower, "celestial")
+    local isDivine = string.find(nameLower, "divine") or string.find(rarityLower, "divine")
     
     if isUfo then displayName = "UFO LUCKY BLOCK" 
     elseif isAdmin then displayName = "ADMIN LUCKY BLOCK"
     elseif isRadioactive then displayName = "RADIOACTIVE LUCKY BLOCK"
-    elseif isMoney then displayName = "MONEY LUCKY BLOCK" end
+    elseif isMoney then displayName = "MONEY LUCKY BLOCK"
+    elseif isCelestial then displayName = "CELESTIAL LUCKY BLOCK"
+    elseif isDivine then displayName = "DIVINE LUCKY BLOCK" end
 
     local shouldShow = false
     if table.find(_G.LB_Filters, "All") then
@@ -252,8 +300,10 @@ local function ApplyLB_ESP(block)
     -- Color Logic
     if isAdmin then hl.FillColor = Color3.fromRGB(255, 50, 50) 
     elseif isRadioactive then hl.FillColor = Color3.fromRGB(150, 255, 0) 
-    elseif isMoney then hl.FillColor = Color3.fromRGB(0, 255, 0) -- Pure Green for Money
+    elseif isMoney then hl.FillColor = Color3.fromRGB(0, 255, 0)
     elseif isUfo then hl.FillColor = Color3.fromRGB(0, 255, 100) 
+    elseif isCelestial then hl.FillColor = Color3.fromRGB(0, 180, 255)
+    elseif isDivine then hl.FillColor = Color3.fromRGB(255, 255, 255)
     else hl.FillColor = Color3.fromRGB(255, 215, 0) end
     
     hl.FillTransparency = 0.5
@@ -277,19 +327,30 @@ local function ApplyLB_ESP(block)
     bb.Parent = block
 end
 
+-- --- AUTOMATION LOGIC ---
+-- This part listens for NEW blocks appearing while the script is running
+LB_PATH.ChildAdded:Connect(function(child)
+    if _G.LB_ESP_Enabled then
+        ApplyLB_ESP(child)
+    end
+end)
+
 GameTab:CreateToggle({
     Name = "Enable Lucky Block ESP",
     CurrentValue = false,
     Flag = "LBToggle",
     Callback = function(Value)
         _G.LB_ESP_Enabled = Value
-        for _, v in ipairs(LB_PATH:GetChildren()) do ApplyLB_ESP(v) end
+        -- Refresh existing blocks when toggled
+        for _, v in ipairs(LB_PATH:GetChildren()) do 
+            if Value then ApplyLB_ESP(v) else RemoveESP(v) end 
+        end
     end,
 })
 
 GameTab:CreateDropdown({
     Name = "Select Rarity Filter",
-    Options = {"All", "Common", "Rare", "Epic", "Legendary", "Mythical", "Cosmic", "Secret", "Ufo", "Admin", "Radioactive", "Money"},
+    Options = {"All", "Common", "Rare", "Epic", "Legendary", "Mythical", "Cosmic", "Secret", "Celestial", "Divine", "Ufo", "Admin", "Radioactive", "Money"},
     CurrentOption = {"All"},
     MultipleOptions = true, 
     Flag = "LBFilter",
@@ -702,7 +763,7 @@ task.spawn(function()
 end)
 
 -- --- BRAINROT PLOT SECTION ---
-Automation:CreateSection("Auto Upgrade&Collect Money")
+Automation:CreateSection("Auto Upgrade & Collect Money")
 
 Automation:CreateDropdown({
    Name = "Select Target Stands",
@@ -713,6 +774,7 @@ Automation:CreateDropdown({
    Callback = function(Options) SelectedStands = Options end,
 })
 
+-- Money collection kept exactly as requested
 Automation:CreateToggle({
    Name = "Auto-Collect Money",
    CurrentValue = false,
@@ -738,29 +800,45 @@ Automation:CreateToggle({
 })
 
 Automation:CreateButton({
-   Name = "Auto-Max Level Brainrot",
+   Name = "Auto-Max Level Brainrot (150)",
    Callback = function()
       if MyPlotID == "Searching..." then Rayfield:Notify({Title = "Error", Content = "Base not found!", Duration = 3}) return end
       local remote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Net"):FindFirstChild("RF/Plot.PlotAction")
       
       for _, standNum in ipairs(SelectedStands) do
          task.spawn(function()
-            -- Attempt to find level via Plot folder
             local currentLevel = 0
+            
             pcall(function()
                 local plot = workspace.Bases:FindFirstChild(MyPlotID)
                 local stand = plot.Stands:FindFirstChild(tostring(standNum))
-                local lvl = stand:FindFirstChild("Level") or stand:FindFirstChild("Stage")
-                currentLevel = lvl and lvl.Value or 0
+                
+                -- FIXED DETECTION LOGIC
+                -- Check for Value Objects (Level/Stage) or Attributes
+                local lvlObj = stand:FindFirstChild("Level") or stand:FindFirstChild("Stage") or stand:FindFirstChild("Configuration") and stand.Configuration:FindFirstChild("Level")
+                
+                if lvlObj then
+                    currentLevel = lvlObj.Value
+                elseif stand:GetAttribute("Level") then
+                    currentLevel = stand:GetAttribute("Level")
+                end
             end)
 
-            local needed = 125 - currentLevel
+            -- Updated Limit to 150
+            local MAX_LEVEL = 150
+            local needed = MAX_LEVEL - currentLevel
+            
             if needed > 0 then
-               for i = 1, needed do
-                  pcall(function() remote:InvokeServer("Upgrade Brainrot", MyPlotID, tostring(standNum)) end)
-                  if i % 10 == 0 then task.wait() end 
-               end
-               Rayfield:Notify({Title = "Upgraded", Content = "Stand "..standNum.." reached Max!", Duration = 2})
+                for i = 1, needed do
+                   -- Remote call to upgrade
+                   local success = pcall(function() remote:InvokeServer("Upgrade Brainrot", MyPlotID, tostring(standNum)) end)
+                   
+                   -- Performance safety: small wait every 5 upgrades to prevent kick/lag
+                   if i % 5 == 0 then task.wait(0.05) end 
+                end
+                Rayfield:Notify({Title = "Upgraded", Content = "Stand "..standNum.." upgraded to Max (150)!", Duration = 2})
+            else
+                Rayfield:Notify({Title = "Maxed", Content = "Stand "..standNum.." is already Max level!", Duration = 2})
             end
          end)
       end
