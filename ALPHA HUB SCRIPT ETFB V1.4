@@ -244,8 +244,9 @@ GameTab:CreateSection("VIP Navigation ( DO NOT SPAM )")
 GameTab:CreateButton({
     Name = "Destroy VIP Walls",
     Callback = function()
-        -- List of all possible folder locations
+        -- List of all possible folder locations (including ArcadeMap)
         local mapPaths = {
+            workspace:FindFirstChild("ArcadeMap_SharedInstances"),
             workspace:FindFirstChild("MarsMap_SharedInstances"),
             workspace:FindFirstChild("MoneyMap_SharedInstances"),
             workspace:FindFirstChild("DefaultMap_SharedInstances")
@@ -253,6 +254,7 @@ GameTab:CreateButton({
 
         local found = false
 
+        -- Check defined paths first
         for _, folder in ipairs(mapPaths) do
             if folder and folder:FindFirstChild("VIPWalls") then
                 folder.VIPWalls:Destroy()
@@ -260,7 +262,7 @@ GameTab:CreateButton({
             end
         end
 
-        -- Final backup search if the folders didn't work
+        -- Final deep-search backup if the folders above weren't present
         if not found then
             local backup = workspace:FindFirstChild("VIPWalls", true)
             if backup then
@@ -269,6 +271,7 @@ GameTab:CreateButton({
             end
         end
 
+        -- User Feedback
         if found then
             Rayfield:Notify({Title = "Alpha Hub", Content = "VIP Walls Destroyed!", Duration = 3})
         else
@@ -575,6 +578,93 @@ local Automation = Window:CreateTab("Automation", 4483345998)
 
 Automation:CreateSection("Auto Collect Coins")
 
+_G.AutoCollectArcade = false
+_G.AutoCollectTickets = false -- New Toggle Variable
+
+-- [ARCADE CONSOLES]
+Automation:CreateToggle({
+    Name = "Auto-Collect Arcade Consoles",
+    CurrentValue = false,
+    Flag = "ArcadeToggle",
+    Callback = function(Value)
+        _G.AutoCollectArcade = Value
+        if _G.AutoCollectArcade then
+            task.spawn(function()
+                while _G.AutoCollectArcade do
+                    pcall(function()
+                        local arcadeFolder = workspace:FindFirstChild("ArcadeEventConsoles")
+                        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                        
+                        if arcadeFolder and hrp then
+                            for _, console in ipairs(arcadeFolder:GetChildren()) do
+                                if not _G.AutoCollectArcade then break end
+                                local targetPart = console:FindFirstChild("Game Console") or (console:IsA("BasePart") and console)
+                                
+                                if targetPart and hrp then
+                                    -- FLING FIX --
+                                    targetPart.CanCollide = false
+                                    targetPart.Velocity = Vector3.new(0,0,0)
+                                    
+                                    targetPart.CFrame = hrp.CFrame
+                                    task.delay(0.9, function()
+                                        if console then console:Destroy() end
+                                    end)
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+
+-- [ARCADE TICKETS] - NEW ADDITION
+Automation:CreateToggle({
+    Name = "Auto-Collect Arcade Tickets",
+    CurrentValue = false,
+    Flag = "TicketToggle",
+    Callback = function(Value)
+        _G.AutoCollectTickets = Value
+        if _G.AutoCollectTickets then
+            task.spawn(function()
+                while _G.AutoCollectTickets do
+                    pcall(function()
+                        local ticketFolder = workspace:FindFirstChild("ArcadeEventTickets")
+                        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                        
+                        if ticketFolder and hrp then
+                            for _, ticketModel in ipairs(ticketFolder:GetChildren()) do
+                                if not _G.AutoCollectTickets then break end
+                                
+                                -- Targets the "Ticket" part inside the model
+                                local realTicket = ticketModel:FindFirstChild("Ticket")
+                                if realTicket and realTicket:IsA("BasePart") then
+                                    -- FLING FIX --
+                                    realTicket.CanCollide = false
+                                    realTicket.Velocity = Vector3.new(0,0,0)
+                                    
+                                    -- Bring the ticket to you and trigger the touch
+                                    realTicket.CFrame = hrp.CFrame
+                                    firetouchinterest(hrp, realTicket, 0)
+                                    task.wait(0.05) -- Brief wait to ensure registration
+                                    firetouchinterest(hrp, realTicket, 1)
+                                    
+                                    -- REMOVED: ticketModel:Destroy() 
+                                    -- Let the game server handle the removal upon successful collection
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+
+-- [MONEY COINS]
 _G.AutoTPMoneyEvent = false
 _G.MoneyTPDelay = 0.2 
 
@@ -587,38 +677,28 @@ Automation:CreateToggle({
         if Value then
             task.spawn(function()
                 while _G.AutoTPMoneyEvent do
-                    local character = Player.Character
-                    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                     local moneyFolder = workspace:FindFirstChild("MoneyEventParts")
                     
                     if hrp and moneyFolder then
                         for _, coin in ipairs(moneyFolder:GetChildren()) do
                             if not _G.AutoTPMoneyEvent then break end
-                            
                             local mainPart = coin:FindFirstChild("Main")
                             
                             if mainPart and mainPart:IsA("BasePart") then
-                                -- FIX: Stop physics from pulling the PLAYER to the COIN
-                                mainPart.Velocity = Vector3.new(0,0,0)
-                                mainPart.RotVelocity = Vector3.new(0,0,0)
-                                mainPart.CanCollide = false -- Prevents coin from hitting/moving you
+                                -- FLING FIX --
+                                mainPart.CanCollide = false
+                                mainPart.Velocity = Vector3.zero
+                                mainPart.RotVelocity = Vector3.zero
                                 
-                                -- Teleport the coin to a position slightly in front of you
-                                -- (Using CFrame.new ensures the coin moves to you, not vice versa)
                                 mainPart.CFrame = hrp.CFrame * CFrame.new(0, 0, -1)
-                                
-                                -- Simulate the touch
                                 firetouchinterest(hrp, mainPart, 0)
                                 task.wait(0.05)
                                 firetouchinterest(hrp, mainPart, 1)
                                 
-                                -- Delayed destruction so server catches up
                                 task.delay(0.9, function()
-                                    if coin and coin.Parent then 
-                                        coin:Destroy() 
-                                    end
+                                    if coin and coin.Parent then coin:Destroy() end
                                 end)
-                                
                                 task.wait(_G.MoneyTPDelay)
                             end
                         end
@@ -630,6 +710,7 @@ Automation:CreateToggle({
     end,
 })
 
+-- [UFO COINS]
 _G.AutoCollectUFO = false
 _G.UFO_Delay = 0.15
 
@@ -642,25 +723,21 @@ Automation:CreateToggle({
         if _G.AutoCollectUFO then
             task.spawn(function()
                 local CoinBombEvent = ReplicatedStorage.Packages.Net:FindFirstChild("RE/CoinBombEvent")
-                
-                -- Loop stays active as long as toggle is ON
                 while _G.AutoCollectUFO do
                     local UFOParts = workspace:FindFirstChild("UFOEventParts")
-                    
                     if UFOParts then
                         for _, coin in ipairs(UFOParts:GetChildren()) do
                             if not _G.AutoCollectUFO then break end
-                            
                             local hitbox = coin:FindFirstChild("Hitbox")
                             local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                             
                             if hitbox and hrp then
-                                -- Teleport coin to player and fire event
+                                -- FLING FIX --
+                                hitbox.CanCollide = false
+                                hitbox.Velocity = Vector3.zero
+                                
                                 hitbox.CFrame = hrp.CFrame
-                                if CoinBombEvent then
-                                    CoinBombEvent:FireServer(coin)
-                                end
-                                -- UPDATED: Added a 0.5s delay before local destruction to ensure collection
+                                if CoinBombEvent then CoinBombEvent:FireServer(coin) end
                                 task.delay(0.9, function()
                                     if coin then coin:Destroy() end
                                 end)
@@ -668,27 +745,15 @@ Automation:CreateToggle({
                             task.wait(_G.UFO_Delay)
                         end
                     end
-                    task.wait(1) -- Wait and check again if no coins are currently spawned
+                    task.wait(1)
                 end
             end)
         end
     end,
 })
 
-Automation:CreateSlider({
-    Name = "Collection Delay",
-    Range = {0.05, 1},
-    Increment = 0.05,
-    Suffix = "s",
-    CurrentValue = 0.15,
-    Flag = "UFODelay",
-    Callback = function(Value)
-        _G.UFO_Delay = Value
-    end,
-})
-
+-- [RADIOACTIVE COINS]
 _G.AutoCollectRadioactive = false
-
 Automation:CreateToggle({
     Name = "Auto-Collect Radioactive Coins",
     CurrentValue = false,
@@ -703,12 +768,14 @@ Automation:CreateToggle({
                         local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                         
                         if eventFolder and hrp then
-                            -- Look through EventParts for any Radioactive Coins
                             for _, folder in ipairs(eventFolder:GetChildren()) do
                                 for _, coin in ipairs(folder:GetChildren()) do
                                     if coin.Name == "Radioactive Coin" then
+                                        -- FLING FIX --
+                                        coin.CanCollide = false
+                                        coin.Velocity = Vector3.zero
+                                        
                                         coin.CFrame = hrp.CFrame
-                                        -- UPDATED: Increased delay to 0.5s to ensure collection
                                         task.delay(0.9, function() 
                                             if coin then coin:Destroy() end 
                                         end)
@@ -717,7 +784,7 @@ Automation:CreateToggle({
                             end
                         end
                     end)
-                    task.wait(0.5) -- Optimized wait for background scanning
+                    task.wait(0.5)
                 end
             end)
         end
@@ -897,7 +964,7 @@ Automation:CreateToggle({
 })
 
 Automation:CreateButton({
-    Name = "Instant Max Brainrot (175)",
+    Name = "Instant Max Brainrot (200)", -- Updated Name
     Callback = function()
        if MyPlotID == "Searching..." then Rayfield:Notify({Title = "Error", Content = "Base not found!", Duration = 3}) return end
        local remote = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Net"):FindFirstChild("RF/Plot.PlotAction")
@@ -910,11 +977,14 @@ Automation:CreateButton({
                  local stand = plot.Stands:FindFirstChild(tostring(standNum))
                  local lvlObj = stand:FindFirstChild("Level") or stand:FindFirstChild("Stage") or (stand:FindFirstChild("Configuration") and stand.Configuration:FindFirstChild("Level"))
                  
-                 if lvlObj then currentLevel = lvlObj.Value
-                 elseif stand:GetAttribute("Level") then currentLevel = stand:GetAttribute("Level") end
+                 if lvlObj then 
+                    currentLevel = lvlObj.Value
+                 elseif stand:GetAttribute("Level") then 
+                    currentLevel = stand:GetAttribute("Level") 
+                 end
              end)
 
-             local MAX_LEVEL = 175
+             local MAX_LEVEL = 200 -- Updated Max Level
              local needed = MAX_LEVEL - currentLevel
              
              if needed > 0 then
@@ -922,16 +992,67 @@ Automation:CreateButton({
                     task.spawn(function() 
                         pcall(function() remote:InvokeServer("Upgrade Brainrot", MyPlotID, tostring(standNum)) end)
                     end)
+                    -- Small delay every 15 iterations to prevent potential remote exhaustion/kick
                     if i % 15 == 0 then task.wait(0.02) end 
                  end
              end
           end)
        end
-       Rayfield:Notify({Title = "Alpha Hub", Content = "Instant upgrade batch sent!", Duration = 2})
+       Rayfield:Notify({Title = "Alpha Hub", Content = "Upgrading to Level 200...", Duration = 2})
     end,
 })
 
 Automation:CreateSection("Auto Spawn Machine")
+
+local isRunning = false
+
+Automation:CreateToggle({
+   Name = "Auto Steal Common Brainrot [fuse]",
+   CurrentValue = false,
+   Flag = "BrainrotToggle", -- Unique identifier for config saving
+   Callback = function(Value)
+      isRunning = Value
+      
+      if isRunning then
+         -- Run the logic in a separate thread so the UI doesn't freeze
+         task.spawn(function()
+            local COMMON_FOLDER = workspace:WaitForChild("ActiveBrainrots"):WaitForChild("Common")
+            local SAFE_ZONE = workspace:WaitForChild("Misc"):WaitForChild("Ground")
+            local PLAYER = game.Players.LocalPlayer
+            
+            while isRunning do
+               local CHARACTER = PLAYER.Character
+               local ROOT = CHARACTER and CHARACTER:FindFirstChild("HumanoidRootPart")
+               
+               if ROOT then
+                  local targets = COMMON_FOLDER:GetChildren()
+                  
+                  if #targets > 0 then
+                     local target = targets[1]
+                     -- Safely find the prompt based on your example
+                     local prompt = target:FindFirstChild("Root") and target.Root:FindFirstChild("TakePrompt")
+                     
+                     if prompt then
+                        -- Teleport to Brainrot
+                        ROOT.CFrame = target.Root.CFrame
+                        task.wait(0.3)
+                        
+                        -- Steal it
+                        fireproximityprompt(prompt)
+                        task.wait(0.2)
+                        
+                        -- Return to Safezone
+                        ROOT.CFrame = SAFE_ZONE.CFrame + Vector3.new(0, 3, 0)
+                        task.wait(0.5)
+                     end
+                  end
+               end
+               task.wait(0.1) -- Small delay to prevent lag
+            end
+         end)
+      end
+   end,
+})
 
 Automation:CreateDropdown({
    Name = "Select Machine",
