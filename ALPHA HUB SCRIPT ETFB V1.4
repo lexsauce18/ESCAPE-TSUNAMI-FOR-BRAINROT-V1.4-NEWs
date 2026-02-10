@@ -340,13 +340,17 @@ local function ApplyLB_ESP(block)
     local isMoney = string.find(nameLower, "money") or string.find(rarityLower, "money")
     local isCelestial = string.find(nameLower, "celestial") or string.find(rarityLower, "celestial")
     local isDivine = string.find(nameLower, "divine") or string.find(rarityLower, "divine")
+    local isGamer = string.find(nameLower, "gamer") or string.find(rarityLower, "gamer")
+    local isInfinity = string.find(nameLower, "infinity") or string.find(rarityLower, "infinity")
     
     if isUfo then displayName = "UFO LUCKY BLOCK" 
     elseif isAdmin then displayName = "ADMIN LUCKY BLOCK"
     elseif isRadioactive then displayName = "RADIOACTIVE LUCKY BLOCK"
     elseif isMoney then displayName = "MONEY LUCKY BLOCK"
     elseif isCelestial then displayName = "CELESTIAL LUCKY BLOCK"
-    elseif isDivine then displayName = "DIVINE LUCKY BLOCK" end
+    elseif isDivine then displayName = "DIVINE LUCKY BLOCK"
+    elseif isGamer then displayName = "GAMER LUCKY BLOCK"
+    elseif isInfinity then displayName = "INFINITY LUCKY BLOCK" end
 
     local shouldShow = false
     if table.find(_G.LB_Filters, "All") then
@@ -372,6 +376,8 @@ local function ApplyLB_ESP(block)
     elseif isUfo then hl.FillColor = Color3.fromRGB(0, 255, 100) 
     elseif isCelestial then hl.FillColor = Color3.fromRGB(0, 180, 255)
     elseif isDivine then hl.FillColor = Color3.fromRGB(255, 255, 255)
+    elseif isGamer then hl.FillColor = Color3.fromRGB(255, 0, 255) -- Purple/Magenta
+    elseif isInfinity then hl.FillColor = Color3.fromRGB(75, 0, 130) -- Indigo
     else hl.FillColor = Color3.fromRGB(255, 215, 0) end
     
     hl.FillTransparency = 0.5
@@ -396,7 +402,6 @@ local function ApplyLB_ESP(block)
 end
 
 -- --- AUTOMATION LOGIC ---
--- This part listens for NEW blocks appearing while the script is running
 LB_PATH.ChildAdded:Connect(function(child)
     if _G.LB_ESP_Enabled then
         ApplyLB_ESP(child)
@@ -409,7 +414,6 @@ GameTab:CreateToggle({
     Flag = "LBToggle",
     Callback = function(Value)
         _G.LB_ESP_Enabled = Value
-        -- Refresh existing blocks when toggled
         for _, v in ipairs(LB_PATH:GetChildren()) do 
             if Value then ApplyLB_ESP(v) else RemoveESP(v) end 
         end
@@ -418,7 +422,8 @@ GameTab:CreateToggle({
 
 GameTab:CreateDropdown({
     Name = "Select Rarity Filter",
-    Options = {"All", "Common", "Rare", "Epic", "Legendary", "Mythical", "Cosmic", "Secret", "Celestial", "Divine", "Ufo", "Admin", "Radioactive", "Money"},
+    -- Added Gamer and Infinity to the options list below
+    Options = {"All", "Common", "Rare", "Epic", "Legendary", "Mythical", "Cosmic", "Secret", "Celestial", "Divine", "Ufo", "Admin", "Radioactive", "Money", "Gamer", "Infinity"},
     CurrentOption = {"All"},
     MultipleOptions = true, 
     Flag = "LBFilter",
