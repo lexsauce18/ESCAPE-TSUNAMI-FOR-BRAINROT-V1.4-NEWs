@@ -1061,7 +1061,7 @@ Automation:CreateToggle({
 
 Automation:CreateDropdown({
    Name = "Select Machine",
-   Options = {"Default", "ATM", "Blackhole"}, 
+   Options = {"Default", "ATM", "Blackhole", "Arcade"}, 
    CurrentOption = {"Default"},
    Callback = function(Option) SelectedMachineName = Option[1] end,
 })
@@ -1098,7 +1098,7 @@ Automation:CreateButton({
             -- 4. Return to last location
             task.wait(0.1)
             root.CFrame = oldPos
-            Rayfield:Notify({Title = "Success", Content = "Blink-Craft Completed", Duration = 2})
+            Rayfield:Notify({Title = "Success", Content = "Blink-Craft Completed for " .. SelectedMachineName, Duration = 2})
         end
     end,
 })
